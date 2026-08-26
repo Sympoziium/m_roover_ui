@@ -204,7 +204,11 @@ class ServerController:
             turn_speed=self.manual_turn_speed,
         )
         ### pas sur que ces sa la vraie fonction
-        self.control_manager.update_last_command_from_controller(ctrl)
+        self.control_manager._active_controller.set_compound_action(
+            throttle, steering,
+            drive_speed=self.manual_drive_speed,
+            turn_speed=self.manual_turn_speed,
+        )
         return ('', 204)
 
     def control_stop(self):
