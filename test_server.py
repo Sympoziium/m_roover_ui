@@ -1,4 +1,15 @@
-"""Petit serveur de test pour developper sans le robot."""
+"""
+test_server.py
+
+Description:
+    Serveur de test pour le module m_roover_ui. Il permet de simuler un robot et un ControlManager
+    afin de tester l'interface web sans avoir besoin du robot physique.
+
+Usage:
+    dans un terminal, naviguer vers le dossier RoverMk1/ puis lancer:
+        python -m roover.m_roover_ui.test_server
+
+"""
 
 from __future__ import annotations
 
@@ -155,8 +166,8 @@ class MockVisionPipeline:
 def create_app():
     robot = MockRobot()
     controller = ServerController(robot, debug=True)
-    controller.attach_control_manager(MockControlManager(robot))
-    controller.attach_pipeline_vision(MockVisionPipeline())
+    controller.SC_Set_Control_Manager(MockControlManager(robot))
+    controller.SC_Set_Vision_Pipeline(MockVisionPipeline())
     return register_routes(controller)
 
 

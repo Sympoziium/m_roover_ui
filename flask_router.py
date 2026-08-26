@@ -1,6 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
+# File : flask_router.py
+#
+# Description : Enregistre les routes Flask de l'app Roover Mk1.
+
+
 """Enregistre les routes Flask de l'app Roover Mk1 minimale."""
+
 
 
 def register_routes(ctrl):

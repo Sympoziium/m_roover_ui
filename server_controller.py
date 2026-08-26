@@ -14,9 +14,32 @@ except ImportError:
 
 
 class ServerController:
-    """Etat partage entre les routes Flask et le backend injection."""
+    """ServerController
+    Classe de gestion du serveur Flask servant d'interface de contrôle pour le robot Roover Mk1.
+    
+    Description:
+        Cette classe encapsule un serveur Flask servant à relier l'interface de contrôle web au robot.
+        On y retrouve principalement les endpoints reliant les actions des boutons de l'interface aux
+        méthodes fonctionnalités du robot.
+
+    Attributes:
+        robot: Instance de la classe Robot.
+        control_manager: Instance de ControlManager.
+        vision_pipeline: Instance de VisionPipeline.
+        debug: Mode debug.
+
+    Methods:
+        SC_Set_Control_Manager(control_manager): Attache le ControlManager.
+        SC_Set_Vision_Pipeline(vision_pipeline): Attache le VisionPipeline.
+    """
 
     def __init__(self, robot, debug=False):
+        """Instance du serveur Flask pour l'interface web de Roover Mk1.
+        
+        Args:
+            robot: Instance de la classe Robot.
+            debug: Si True, active le mode debug Flask (rechargement auto).
+        """
         self.robot = robot
         self.control_manager = None
         self.vision_pipeline = None
@@ -28,11 +51,29 @@ class ServerController:
         self.app = Flask(__name__)
         self.app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-    def attach_control_manager(self, control_manager):
+##########################################################
+#  Setters
+##########################################################
+
+    def SC_Set_Control_Manager(self, control_manager):
+        """
+        Setter pour attacher le ControlManager au ServerController.
+        Args:
+            control_manager: Instance de ControlManager.
+        """
         self.control_manager = control_manager
 
-    def attach_pipeline_vision(self, vision_pipeline):
+    def SC_Set_Vision_Pipeline(self, vision_pipeline):
+        """
+        Setter pour attacher le VisionPipeline au ServerController.
+        Args:
+            vision_pipeline: Instance de VisionPipeline.
+        """
         self.vision_pipeline = vision_pipeline
+
+##########################################################
+#   Onglets
+##########################################################
 
     def home(self):
         return render_template_string(_HOME_HTML)
@@ -40,7 +81,21 @@ class ServerController:
     def onglet_control(self):
         return render_control_tab()
 
+###########################################################
+#   Endpoints
+###########################################################
+
     def video_feed(self):
+        """
+        Endpoint pour le flux vidéo.
+        
+        Description:
+            Cette méthode génère un flux vidéo en continu à partir de la caméra du robot.
+            Elle encode chaque image en JPEG et les envoie au client via un flux multipart.
+
+        Returns:
+            Response: Objet Flask Response contenant le flux vidéo.
+        """
         vp = self.vision_pipeline
         if vp is None or not vp.is_running():
             return ("Camera OFF", 503)
@@ -48,6 +103,7 @@ class ServerController:
         def generate():
             while vp.is_running():
                 try:
+                    # capture de l'image depuis la caméra du robot
                     frame = vp.camera.capture()
                 except Exception as exc:
                     print("[video_feed] erreur capture:", exc)
@@ -57,9 +113,10 @@ class ServerController:
                 if frame is None:
                     time.sleep(0.05)
                     continue
-
+                # mise à jour de la dernière image dans le buffer du pipeline de vision
                 vp.update_last_frame(frame)
                 ok, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+
                 if ok:
                     yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
                            + jpeg.tobytes() + b'\r\n')
@@ -67,10 +124,19 @@ class ServerController:
         return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
     def controller_start_manual(self):
+        """
+        Description:
+            Endpoint pour activer le contrôleur manuel.
+
+        Returns:
+            Response: Objet Flask Response indiquant le succès ou l'échec de l'activation.
+        """
+        # Vérification de l'attachement du ControlManager et du ManualController
         if self.control_manager is None:
             return jsonify({'error': 'ControlManager non attache'}), 500
         if self.control_manager.get_controller('manual_controller') is None:
             return jsonify({'error': 'ManualController non enregistre'}), 500
+        
         try:
             self.control_manager.activate_controller('manual_controller')
             return jsonify({'status': 'manual_controller activated'})
@@ -78,6 +144,13 @@ class ServerController:
             return jsonify({'error': str(exc)}), 500
 
     def controller_stop(self):
+        """
+        Description:
+            Endpoint pour arrêter le contrôleur.
+
+        Returns:
+            Response: Objet Flask Response indiquant le succès ou l'échec de l'arrêt.
+        """
         if self.control_manager is None:
             return jsonify({'error': 'ControlManager non attache'}), 500
         try:
@@ -87,17 +160,32 @@ class ServerController:
             return jsonify({'error': str(exc)}), 500
 
     def controller_status(self):
+        """
+        Description:
+            Endpoint pour obtenir le statut du contrôleur actif.
+        Returns:
+            Response: Objet Flask Response contenant le statut du contrôleur.
+        """
         if self.control_manager is None:
             return jsonify({'active': False, 'reason': 'ControlManager non attache'})
-        active = self.control_manager._active_controller
+        active_controller = self.control_manager._active_controller
         return jsonify({
-            'active': active is not None,
-            'name': active.name if active is not None else None,
+            'active': active_controller is not None,
+            'name': active_controller.name if active_controller is not None else None,
             'left_speed': self.control_manager.last_left_speed,
             'right_speed': self.control_manager.last_right_speed,
         })
 
     def control_keys(self):
+        """
+        Endpoint pour recevoir les commandes de contrôle manuel via les touches WASD.
+        Description:
+            Cette méthode reçoit les commandes de contrôle manuel envoyées par l'interface web.
+            Elle interprète les touches WASD pour déterminer la vitesse de déplacement et de rotation du robot.
+        Returns:
+            Response: Objet Flask Response indiquant le succès ou l'échec du traitement des commandes.
+        """
+        Warning("This method hasent been integrated yet with the ControlManager. ")
         if self.control_manager is None:
             return jsonify({'error': 'ControlManager non attache'}), 500
 
@@ -115,12 +203,17 @@ class ServerController:
             drive_speed=self.manual_drive_speed,
             turn_speed=self.manual_turn_speed,
         )
+        ### pas sur que ces sa la vraie fonction
         self.control_manager.update_last_command_from_controller(ctrl)
         return ('', 204)
 
     def control_stop(self):
+        
+        Warning("This method hasent been integrated yet with the ControlManager. ")
+        """"""
         if self.control_manager is None:
             return jsonify({'error': 'ControlManager non attache'}), 500
+        
         ctrl = self.control_manager.get_controller('manual_controller')
         if ctrl is not None:
             ctrl.set_compound_action(0, 0)

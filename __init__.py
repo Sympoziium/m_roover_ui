@@ -6,3 +6,7 @@ Le code de ce paquet est volontairement autonome pour pouvoir etre extrait en
 
 from .flask_router import register_routes
 from .server_controller import ServerController
+from .onglet_control import render_control_tab
+from .test_server import MockManualController
+from .cnn_utils import *
+
