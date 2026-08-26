@@ -221,7 +221,6 @@ class ServerController:
         ctrl = self.control_manager.get_controller('manual_controller')
         if ctrl is not None:
             ctrl.set_compound_action(0, 0)
-            self.control_manager.update_last_command_from_controller(ctrl)
         if self.control_manager.manual_override_active:
             self.control_manager.clear_manual_override()
         return ('', 204)
