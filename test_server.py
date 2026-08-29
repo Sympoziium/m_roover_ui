@@ -32,26 +32,6 @@ class MockManualController:
     def __init__(self):
         self._throttle = 0
         self._steering = 0
-        self._drive_speed = 60
-        self._turn_speed = 45
-
-    @staticmethod
-    def compute_speeds(throttle, steering, drive_speed, turn_speed, steering_ratio=0.5):
-        if throttle == 0 and steering == 0:
-            return (0, 0)
-        if throttle == 0:
-            return (steering * turn_speed, -steering * turn_speed)
-
-        base = throttle * drive_speed
-        if steering == 0:
-            return (base, base)
-
-        half_diff = base * steering_ratio
-        inner = base - half_diff
-        outer = base + half_diff
-        if steering < 0:
-            return (inner, outer)
-        return (outer, inner)
 
     def start(self):
         self._throttle = 0
@@ -61,13 +41,25 @@ class MockManualController:
         self._throttle = 0
         self._steering = 0
 
-    def set_compound_action(self, throttle, steering, drive_speed=None, turn_speed=None):
-        self._throttle = throttle
-        self._steering = steering
-        if drive_speed is not None:
-            self._drive_speed = drive_speed
-        if turn_speed is not None:
-            self._turn_speed = turn_speed
+    def step(self, command):
+        self._throttle = ('w' in command) - ('s' in command)
+        self._steering = ('d' in command) - ('a' in command)
+
+        throttle = self._throttle * 0.50
+        steering = self._steering * 0.35
+        if throttle == 0 and steering == 0:
+            return (0, 0)
+        if throttle == 0:
+            return (steering, -steering)
+        if steering == 0:
+            return (throttle, throttle)
+
+        half_diff = throttle * 0.95
+        inner = throttle - half_diff
+        outer = throttle + half_diff
+        if steering < 0:
+            return (inner, outer)
+        return (outer, inner)
 
 
 class MockControlManager:
@@ -77,10 +69,12 @@ class MockControlManager:
         self._active_controller = None
         self.last_left_speed = 0
         self.last_right_speed = 0
-        self.manual_override_active = False
 
     def get_controller(self, name):
         return self._controllers.get(name)
+
+    def get_active_controller(self):
+        return self._active_controller
 
     def activate_controller(self, name):
         controller = self.get_controller(name)
@@ -99,16 +93,20 @@ class MockControlManager:
         self.last_right_speed = 0
         self.robot.stop()
 
-    def clear_manual_override(self):
-        self.manual_override_active = False
+    def update_command(self, command):
+        if command == 'STOP':
+            self.last_left_speed = 0
+            self.last_right_speed = 0
+            self.robot.stop()
+            return
 
-    def update_last_command_from_controller(self, controller):
-        left, right = controller.compute_speeds(
-            controller._throttle,
-            controller._steering,
-            controller._drive_speed,
-            controller._turn_speed,
-        )
+        if isinstance(command, (set, list, tuple)):
+            command = ''.join(key for key in 'wasd' if key in command)
+        command = command.lower()
+        if not command or any(key not in 'wasd' for key in command):
+            raise ValueError(f"Invalid command: {command}")
+
+        left, right = self._active_controller.step(command)
         self.last_left_speed = left
         self.last_right_speed = right
         self.robot.set_wheel_speeds(left, right)
