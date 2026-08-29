@@ -2,10 +2,17 @@
 # -*- coding: utf-8 -*-
 """Controleur Flask minimaliste pour Roover Mk1 (UI + mode test)."""
 
+from __future__ import annotations
+
 import time
+from typing import TYPE_CHECKING
 
 import cv2
 from flask import Flask, Response, jsonify, render_template_string, request
+
+if TYPE_CHECKING:
+    from core.control.control_manager import ControlManager
+    from roover.core.vision.vision_pipeline import VisionPipeline
 
 try:
     from .onglet_control import render_control_tab
@@ -32,6 +39,12 @@ class ServerController:
         SC_Set_Control_Manager(control_manager): Attache le ControlManager.
         SC_Set_Vision_Pipeline(vision_pipeline): Attache le VisionPipeline.
     """
+##################################################################
+#   Constantes
+##################################################################
+
+    _MANUAL_DRIVE_SPEED = 60
+    _MANUAL_TURN_SPEED = 45
 
     def __init__(self, robot, debug=False):
         """Instance du serveur Flask pour l'interface web de Roover Mk1.
@@ -41,21 +54,39 @@ class ServerController:
             debug: Si True, active le mode debug Flask (rechargement auto).
         """
         self.robot = robot
-        self.control_manager = None
-        self.vision_pipeline = None
+        self.control_manager: ControlManager | None = None
+        self.vision_pipeline: VisionPipeline | None = None
         self.debug = debug
-
-        self.manual_drive_speed = 60
-        self.manual_turn_speed = 45
 
         self.app = Flask(__name__)
         self.app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 ##########################################################
+#  Fonctions protégées
+##########################################################
+
+    @property
+    def _get_control_manager(self):
+        """Getter pour le ControlManager attaché au ServerController."""
+        return self.control_manager
+
+    @property
+    def _get_manual_controller(self):
+        """Getter pour le ManualController attaché au ControlManager."""
+        if self.control_manager is None:
+            return None
+        return self.control_manager.get_controller('manual_controller')
+    
+    @property
+    def _get_vision_pipeline(self):
+        """Getter pour le VisionPipeline attaché au ServerController."""
+        return self.vision_pipeline
+
+##########################################################
 #  Setters
 ##########################################################
 
-    def SC_Set_Control_Manager(self, control_manager):
+    def SC_Set_Control_Manager(self, control_manager:ControlManager):
         """
         Setter pour attacher le ControlManager au ServerController.
         Args:
@@ -63,7 +94,7 @@ class ServerController:
         """
         self.control_manager = control_manager
 
-    def SC_Set_Vision_Pipeline(self, vision_pipeline):
+    def SC_Set_Vision_Pipeline(self, vision_pipeline:VisionPipeline):
         """
         Setter pour attacher le VisionPipeline au ServerController.
         Args:
@@ -185,44 +216,38 @@ class ServerController:
         Returns:
             Response: Objet Flask Response indiquant le succès ou l'échec du traitement des commandes.
         """
-        Warning("This method hasent been integrated yet with the ControlManager. ")
         if self.control_manager is None:
             return jsonify({'error': 'ControlManager non attache'}), 500
 
-        ctrl = self.control_manager.get_controller('manual_controller')
-        if ctrl is None:
-            return jsonify({'error': 'ManualController non enregistre'}), 500
+        ctrl_mgr = self.control_manager
+        ctrl = ctrl_mgr.get_active_controller()
+        if ctrl is None or ctrl.name != 'manual_controller':
+            ctrl_mgr.activate_controller('manual_controller')
 
         data = request.get_json(silent=True) or {}
         keys = set(k.lower() for k in data.get('keys', []))
-        throttle = (1 if 'w' in keys else 0) + (-1 if 's' in keys else 0)
-        steering = (-1 if 'a' in keys else 0) + (1 if 'd' in keys else 0)
+        command = ''.join(key for key in 'wasd' if key in keys)
 
-        ctrl.set_compound_action(
-            throttle, steering,
-            drive_speed=self.manual_drive_speed,
-            turn_speed=self.manual_turn_speed,
-        )
-        ### pas sur que ces sa la vraie fonction
-        self.control_manager._active_controller.set_compound_action(
-            throttle, steering,
-            drive_speed=self.manual_drive_speed,
-            turn_speed=self.manual_turn_speed,
-        )
+        # Dispatch des commandes manuelles vers le ControlManager
+        ctrl_mgr.update_command(command)
+
         return ('', 204)
 
     def control_stop(self):
-        
-        Warning("This method hasent been integrated yet with the ControlManager. ")
-        """"""
+        """
+        Description:
+            Endpoint pour envoyer automatiquement un stop 
+            au robot lorsque l'utilisateur relâche toutes les touches de contrôle.
+        Returns:
+            Response: Objet Flask Response indiquant le succès ou l'échec de l'arrêt du contrôle.
+        """
         if self.control_manager is None:
             return jsonify({'error': 'ControlManager non attache'}), 500
         
-        ctrl = self.control_manager.get_controller('manual_controller')
-        if ctrl is not None:
-            ctrl.set_compound_action(0, 0)
-        if self.control_manager.manual_override_active:
-            self.control_manager.clear_manual_override()
+        ctrl_mgr = self.control_manager
+
+        ctrl_mgr.update_command('STOP')
+
         return ('', 204)
 
 
