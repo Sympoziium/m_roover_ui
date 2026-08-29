@@ -46,5 +46,12 @@ Pour utiliser les fonctions de ce module, vous devez importer le fichier `flask_
 ### test_server.py
 
 
+### Architecture du projet
+
+**Décision de concept initial**
+pour commencer je veux simplement pouvoir contrôler le robot manuellement avec WASD. on va donc hardcoder les touches et les actions associées pour avoir un premier prototype fonctionnel.
+
+
+
 
 ---
