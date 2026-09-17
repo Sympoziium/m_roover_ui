@@ -226,7 +226,7 @@ class ServerController:
 
         data = request.get_json(silent=True) or {}
         keys = set(k.lower() for k in data.get('keys', []))
-        command = ''.join(key for key in 'wasd' if key in keys)
+        command = ''.join(key for key in 'wasdqe' if key in keys)
 
         # Dispatch des commandes manuelles vers le ControlManager
         ctrl_mgr.update_command(command)
