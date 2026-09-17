@@ -39,6 +39,8 @@ _PAGE_HTML = """<!doctype html>
   .key-a { grid-column:1; grid-row:2; }
   .key-s { grid-column:2; grid-row:2; }
   .key-d { grid-column:3; grid-row:2; }
+  .key-q { grid-column:1; grid-row:1; }
+  .key-e { grid-column:3; grid-row:1; }
   p.hint { color:#567; font-size:0.9rem; }
 </style>
 </head>
@@ -57,6 +59,8 @@ _PAGE_HTML = """<!doctype html>
       <div class='key key-a' id='keyA'>A</div>
       <div class='key key-s' id='keyS'>S</div>
       <div class='key key-d' id='keyD'>D</div>
+      <div class='key key-q' id='keyQ'>Q</div>
+      <div class='key key-e' id='keyE'>E</div>
     </div>
     <div class='status' id='status'>Inactif</div>
   </div>
@@ -64,12 +68,12 @@ _PAGE_HTML = """<!doctype html>
 
 <script>
 (function() {
-  var held = { w:false, a:false, s:false, d:false };
+  var held = { w:false, a:false, s:false, d:false, q:false, e:false };
   var sendInterval = null;
   var statusEl = document.getElementById('status');
 
   function refreshKeys() {
-    ['w','a','s','d'].forEach(function(k) {
+    ['w','a','s','d','q','e'].forEach(function(k) {
       var el = document.getElementById('key' + k.toUpperCase());
       if (held[k]) { el.classList.add('active'); }
       else { el.classList.remove('active'); }
@@ -93,12 +97,12 @@ _PAGE_HTML = """<!doctype html>
 
   function stopPolling() {
     if (sendInterval) { clearInterval(sendInterval); sendInterval = null; }
-    held = { w:false, a:false, s:false, d:false };
+    held = { w:false, a:false, s:false, d:false, q:false, e:false };
     refreshKeys();
     fetch('/control/stop', { method: 'POST' }).catch(function() {});
   }
 
-  function isWasd(k) { return ['w','a','s','d'].indexOf(k) >= 0; }
+  function isWasd(k) { return ['w','a','s','d','q','e'].indexOf(k) >= 0; }
 
   document.addEventListener('keydown', function(e) {
     var k = (e.key || '').toLowerCase();
@@ -114,7 +118,7 @@ _PAGE_HTML = """<!doctype html>
     if (!isWasd(k)) return;
     held[k] = false;
     refreshKeys();
-    var any = held.w || held.a || held.s || held.d;
+    var any = held.w || held.a || held.s || held.d || held.q || held.e;
     if (any) { sendKeys(); } else { stopPolling(); }
   });
 
